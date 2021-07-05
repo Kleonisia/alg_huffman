@@ -1,0 +1,293 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+using namespace std;
+int a[256];
+int b[256];
+string ans[256];
+char d[256];
+int e = 0;
+string alphabet = "";
+ofstream fout;
+ofstream foutree;
+ifstream fin;
+ofstream fout2;
+void set_zero(int mas[]) {
+	for (int i = 0; i < 256; i++) {
+		a[i] = 0;
+	}
+	return;
+}
+struct node_tree {
+	char inf;
+	int num;
+	string code_huff;
+	node_tree* prev;
+	node_tree* next;
+	node_tree* left;
+	node_tree* right;
+}; 
+node_tree* m = nullptr;
+void ins_head(node_tree*& m, int x, char inform) {
+	node_tree* q = new node_tree;
+	q->prev = nullptr;
+	q->num = x;
+	q->inf = inform;
+	q->next = m;
+	if (m != nullptr) {
+		m->prev = q;
+	}
+	q->left = nullptr;
+	q->right = nullptr;
+	m = q;
+	return;
+}
+
+void ins_head_node_tree(node_tree*& m, node_tree*& T) {
+	T->prev = nullptr;
+	T->next = m;
+	if (m != nullptr) {
+		m->prev = T;
+	}
+	m = T;
+	return;
+}
+pair<int, int> find_two_mins(node_tree* m) {
+	node_tree* q = m;
+	int min1 = 1e9;
+	int min2 = min1;
+	while (q != nullptr) {
+		if (q->num < min1) {
+			min2 = min1;
+			min1 = q->num;
+		}
+		else if (q->num < min2) {
+			min2 = q->num;
+		}
+		q = q->next;
+	}
+	return pair<int, int>(min1, min2);
+}
+void bread(node_tree* m, node_tree*& T, int min1, int min2) {
+	node_tree* q = m;
+	while (q != nullptr) {
+		if (q->num == min1 and T->left == nullptr) {
+			node_tree* p = new node_tree;
+			p->num = q->num;
+			p->inf = q->inf;
+			p->next = nullptr;
+			p->prev = nullptr;
+			p->left = q->left;
+			p->right = q->right;
+			T->left = p;
+		}
+		else if (q->num == min2 and T->right == nullptr) {
+			node_tree* p = new node_tree;
+			p->num = q->num;
+			p->inf = q->inf;
+			p->next = nullptr;
+			p->prev = nullptr;
+			p->left = q->left;
+			p->right = q->right;
+			T->right = p;
+		}
+		q = q->next;
+	}
+	return;
+}
+void del(node_tree*& m, int x) {
+	//сначала ищем указатель на node_tree со значением num равному x
+	node_tree* q = m;
+	while (q != nullptr) {
+		if (q->num == x) {
+			break;
+		}
+		q = q->next;
+	}
+	if (q == nullptr) {
+		return;
+	}
+	node_tree* p = q;
+	if (p->prev == nullptr) {
+		m = p->next;
+	}
+	else {
+		p->prev->next = p->next;
+	}
+	if (p->next != nullptr) {
+		p->next->prev = p->prev;
+		delete(q);
+		return;
+	}
+}
+
+void add_code_huff(node_tree*& m, string str) { //добавляем код для каждого символа
+	if (m == nullptr) {
+		return;
+	}
+	if (m->left == nullptr and m->right == nullptr) {
+		m->code_huff = str;
+		return;
+	}
+	add_code_huff(m->left, str + "0");
+	add_code_huff(m->right, str + "1");
+	return;
+}
+void alg_huff(node_tree*& m) {
+	if (m == nullptr) {
+		return;
+	}
+	int min1, min2;
+	while (m->next != nullptr) {
+		//построение дерева
+		pair <int, int> r = find_two_mins(m); //ищем в m два символа с наименьшей встречаемостью в тексте
+		min1 = r.first;
+		min2 = r.second;
+		node_tree* T = new node_tree;
+		T->inf = '*';
+		T->num = min1 + min2;
+		T->left = nullptr;
+		T->right = nullptr;
+		bread(m, T, min1, min2); //T->left = node_tree от min1 и T->right = node_tree от min2
+		del(m, min1);
+		del(m, min2); //удаление двух элементов min1 и min2 из списка
+		//добавление T в голову списка
+		ins_head_node_tree(m, T);
+	}
+	if (m->next == nullptr) {
+		if (m->inf == '*') {
+			add_code_huff(m, "");//обработка дерева
+		}
+		else {
+			m->code_huff = "0";//обработка дерева
+		}
+		return;
+	}
+	return;
+}
+
+void make_table(node_tree* m) {
+	if (m == nullptr) {
+		return;
+	}
+	if (m->inf != '*') { //если находимся в листе
+		ans[e] = m->code_huff; // ans - строка
+		d[e] = m->inf;
+		e++;
+	}
+	make_table(m->left);
+	make_table(m->right);
+	return;
+	
+}
+
+void cout_tree(node_tree* m) {
+	if (m == nullptr) {
+		return;
+	}
+	if (m->inf != '*') { //если находимся в листе
+		foutree << '{' << m->inf << '}';
+		return;
+	}
+	foutree << '(';
+	cout_tree(m->left);
+	foutree << ')';
+	foutree << '(';
+	cout_tree(m->right);
+	foutree << ')';
+	return;
+
+}
+int main() { //массив a отвечает за кол во встреч в строке определенного символа
+	set_zero(a);
+	string s, str1 = "";
+	fin.open("f.txt");
+	while (!fin.eof()) {
+		getline(fin, s);
+		for (int i = 0; i < s.length(); i++) {
+			++a[s[i]];
+		}
+		++a[10];
+		str1 += s;
+		str1 += "/"; //     '/' -- отвечает за перевод строки
+	}
+	// str1 - весь текст в одной строчке
+	fin.close();
+	int j = 0;
+	char c;
+	for (int i = 0; i < 256; i++) {
+		if (a[i] != 0) {
+			if (i == 10) {
+				alphabet += '/';
+			}
+			else {
+				c = i;
+				alphabet += c;
+			}
+			b[j] = a[i];
+			j++;
+
+		}
+	}
+	//в alphabet хранится весь алфавит символов, в массиве b хранится их количество
+	for (int i = 0; i < j; i++) {
+		ins_head(m, b[i], alphabet[i]);  //записываем в голову m символ и его частота встречаемости в тексте
+	}
+	alg_huff(m);
+	
+	make_table(m);
+
+	fout.open("table.txt");
+	for (int i = 0; i < e; i++) {
+		fout << d[i] << " - " << ans[i] << "\n";
+	}
+	fout.close();
+	foutree.open("tree.txt");
+	cout_tree(m);
+	foutree.close();
+
+	//задача 2: закодировать исходный текст, пользуясь таблицей кодов
+	fout2.open("shifr.txt");
+	for (int i = 0; i < str1.length(); i++) {
+		j = 0;
+		while (j < e) {
+			if (d[j] == str1[i]) {
+				break;
+			}
+			j++;
+		}
+		fout2 << ans[j];
+	}
+	fout2.close();
+	//задача 3: дешифровать закодированный текст, пользуясь shifr
+	ifstream fin3;
+	ofstream fout_deshifr;
+	fout_deshifr.open("deshifr.txt");
+	fin3.open("shifr.txt");
+	string s3;
+	getline(fin3, s3);
+	fin3.close();
+	node_tree* q = m;
+	for (int i = 0; i < s3.length(); i++) {
+		if (s3[i] == '0') {
+			q = q->left;
+		}
+		if (s3[i] == '1') {
+			q = q->right;
+		}
+		if (q->inf != '*') {
+			if (q->inf == '/') {
+				fout_deshifr << endl;
+			}
+			else {
+				fout_deshifr << q->inf;
+			}
+			q = m;
+		}
+	}
+	fout_deshifr.close();
+	return 0;
+}
+
+
+
